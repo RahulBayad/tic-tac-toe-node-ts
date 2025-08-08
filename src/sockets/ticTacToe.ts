@@ -71,7 +71,10 @@ io.on("connection", (socket) => {
   console.log("connected", socket.id);
 
   socket.on("disconnect", () => {
-    console.log("disconnected");
+    console.log("disconnected", available);
+    if(available.includes(socket.id)){
+      available.pop()
+    }
   });
 
   socket.on("findopponent", () => {
@@ -93,7 +96,6 @@ io.on("connection", (socket) => {
 
       io.to(roomId).emit("gameCreated", {
         roomId,
-        // opponent: player2?.id,
         gameState: Array(9).fill(null),
         playerTurn: player1.id,
         currentMove: "X",
@@ -106,11 +108,8 @@ io.on("connection", (socket) => {
   socket.on(
     "make-move",
     (response: { 
-        roomId: string; 
-        gameState: string[]; 
-        playerTurn: string;
-        currentMove: string;
-        winner: null;
+      roomId: string;
+      position: number; //index of board
     }) => {
       const currentRoom = rooms.filter(
         (rm) => rm.roomId === response.roomId
@@ -120,19 +119,20 @@ io.on("connection", (socket) => {
       // {gameState, roomId, currentMove, playerTurn}
 
       currentRoom.playerTurn =
-        response?.playerTurn === currentRoom?.player1
+        currentRoom?.playerTurn === currentRoom?.player1
           ? currentRoom.player2
           : currentRoom.player1;
 
-      currentRoom.currentMove = response?.currentMove === "X" ? "Y" : "X";
-      currentRoom.gameState = response?.gameState
+      currentRoom.gameState[response?.position] = currentRoom.currentMove
+      currentRoom.currentMove = currentRoom.currentMove === "X" ? "O" : "X";
 
       const winner = checkWinner(currentRoom.gameState)
       currentRoom.winner = !winner ? null : socket.id
 
       if(winner){
         io.to(currentRoom.roomId).emit("won",{
-            winner: !winner ? null : socket.id
+            winner: !winner ? null : socket.id,
+            gameState: currentRoom.gameState,
         })
       }else{
         io.to(currentRoom.roomId).emit("get-move",{
